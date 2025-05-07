@@ -16,7 +16,7 @@ const productRoutes = async (app: FastifyInstance) => {
   app.post("/", createProduct);
   app.post("/stock-in", stockIn);
   app.post("/stock-out", stockOut);
-  app.delete("/:id", deleteProduct);
+  app.post("/delete", deleteProduct);
 };
 
 export default productRoutes;

@@ -151,11 +151,13 @@ export const stockOut = async (
   }
 };
 export const deleteProduct = async (
-  req: FastifyRequest<{ Params: { id: string } }>,
+  req: FastifyRequest<{ Body: StockTransactionBody }>,
   reply: FastifyReply
 ) => {
+  const { productId } = req.body;
+
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findByIdAndDelete(productId);
     if (!product) {
       return reply
         .status(HttpStatusCode.NOT_FOUND)
