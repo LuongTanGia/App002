@@ -56,7 +56,24 @@ export const getProducts = async (req: FastifyRequest, reply: FastifyReply) => {
       .send({ error: "Error fetching products", details: error.message });
   }
 };
-
+export const getProductById = async (
+  req: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return reply
+        .status(HttpStatusCode.NOT_FOUND)
+        .send({ error: "Product not found" });
+    }
+    return reply.status(HttpStatusCode.OK).send(product);
+  } catch (error: any) {
+    return reply
+      .status(HttpStatusCode.BAD_REQUEST)
+      .send({ error: "Error fetching product", details: error.message });
+  }
+};
 // Stock in (Add to inventory)
 export const stockIn = async (
   req: FastifyRequest<{ Body: StockTransactionBody }>,
@@ -74,13 +91,17 @@ export const stockIn = async (
 
     const userName = (req.user as any)?.userName; // Extract userName from token
 
+    // Cập nhật stock
+
+    product.stock += quantity;
+
     product.transactions.push({
       type: "IN",
       quantity,
       note,
       performedBy: userName,
     });
-    await adjustStock(productId, "IN", quantity, userName, note);
+    await product.save();
 
     return reply.status(HttpStatusCode.OK).send(product);
   } catch (error: any) {
@@ -109,14 +130,43 @@ export const stockOut = async (
         .status(HttpStatusCode.BAD_REQUEST)
         .send({ error: "Not enough stock" });
     }
+    if (product.stock < quantity) throw new Error("Not enough stock to remove");
+    product.stock -= quantity;
 
-    product.transactions.push({ type: "OUT", quantity, note });
-    await adjustStock(productId, "OUT", quantity, userName, note);
+    // Cập nhật dữ liệu đã bán
+    product.sold = (product.sold || 0) + quantity;
+    product.transactions.push({
+      type: "OUT",
+      quantity,
+      note,
+      performedBy: userName,
+    });
+    await product.save();
 
     return reply.status(HttpStatusCode.OK).send(product);
   } catch (error: any) {
     return reply
       .status(HttpStatusCode.BAD_REQUEST)
       .send({ error: "Error reducing stock", details: error.message });
+  }
+};
+export const deleteProduct = async (
+  req: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) {
+      return reply
+        .status(HttpStatusCode.NOT_FOUND)
+        .send({ error: "Product not found" });
+    }
+    return reply
+      .status(HttpStatusCode.OK)
+      .send({ message: "Product deleted successfully", product });
+  } catch (error: any) {
+    return reply
+      .status(HttpStatusCode.BAD_REQUEST)
+      .send({ error: "Error deleting product", details: error.message });
   }
 };

@@ -2,6 +2,8 @@
 import { FastifyInstance } from "fastify";
 import {
   createProduct,
+  deleteProduct,
+  getProductById,
   getProducts,
   stockIn,
   stockOut,
@@ -9,16 +11,12 @@ import {
 
 const productRoutes = async (app: FastifyInstance) => {
   // Route để tạo sản phẩm
-  app.post("/", createProduct);
-
-  // Route để lấy danh sách sản phẩm
   app.get("/", getProducts);
-
-  // Route để nhập kho (cộng tồn kho)
+  app.get("/:id", getProductById);
+  app.post("/", createProduct);
   app.post("/stock-in", stockIn);
-
-  // Route để xuất kho (trừ tồn kho)
   app.post("/stock-out", stockOut);
+  app.delete("/:id", deleteProduct);
 };
 
 export default productRoutes;

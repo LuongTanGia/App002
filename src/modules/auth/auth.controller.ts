@@ -56,7 +56,7 @@ export const loginUser = async (req: FastifyRequest, reply: FastifyReply) => {
       { userId: user._id, userName: user.username },
       JWT_SECRET,
       {
-        expiresIn: "1h",
+        expiresIn: "1d",
       }
     );
 

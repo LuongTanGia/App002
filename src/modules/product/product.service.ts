@@ -18,15 +18,10 @@ export const adjustStock = async (
   } else {
     if (product.stock < quantity) throw new Error("Not enough stock to remove");
     product.stock -= quantity;
+
+    // Cập nhật dữ liệu đã bán
+    product.sold = (product.sold || 0) + quantity;
   }
-  await StockHistory.create({
-    productId,
-    type,
-    quantity,
-    note,
-    performedBy: userName ?? null, // gán userId nếu có
-    timestamp: new Date(), // có thể bỏ vì timestamps đã tự gen
-  });
   await product.save();
 
   // Ghi vào lịch sử

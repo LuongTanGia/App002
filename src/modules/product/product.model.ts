@@ -23,10 +23,8 @@ const transactionSchema = new Schema(
       type: String,
       default: "",
     },
-
     performedBy: {
       type: String,
-
       required: false,
     },
     timestamp: {
@@ -55,6 +53,12 @@ const productSchema = new Schema(
       min: 0,
     },
     stock: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+    sold: {
       type: Number,
       required: true,
       default: 0,
