@@ -14,7 +14,7 @@ dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
 export const verifyToken = async (req: FastifyRequest, reply: FastifyReply) => {
-  const excludedPaths = ["/api/auth/login", "/api/auth/register"];
+  const excludedPaths = ["/api/auth/login", "/api/auth/register", "/docs"];
   if (excludedPaths.includes(req.routerPath || req.raw.url || "")) {
     return;
   }

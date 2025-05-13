@@ -11,8 +11,16 @@ interface CreateProductBody {
   price: number;
   stock: number;
   category: string;
+  code: string;
 }
-
+interface CreateProductListBody {
+  TenHang: string;
+  GiaVon: number;
+  GiaBan: number;
+  TonKho: number;
+  KhachDat: number;
+  MaHang: string;
+}
 interface StockTransactionBody {
   productId: string;
   quantity: number;
@@ -25,7 +33,7 @@ export const createProduct = async (
   reply: FastifyReply
 ) => {
   try {
-    const { name, description, price, stock, category } = req.body;
+    const { name, description, price, stock, category, code } = req.body;
 
     const existingProduct = await Product.findOne({ name });
     if (existingProduct) {
@@ -34,7 +42,14 @@ export const createProduct = async (
         .send({ error: "Product with the same name already exists" });
     }
 
-    const product = new Product({ name, description, price, stock, category });
+    const product = new Product({
+      name,
+      description,
+      price,
+      stock,
+      category,
+      code,
+    });
     await product.save();
 
     return reply.status(HttpStatusCode.INSERT_OK).send(product);
@@ -44,12 +59,65 @@ export const createProduct = async (
       .send({ error: "Error creating product", details: error.message });
   }
 };
+export const createProductList = async (
+  req: FastifyRequest<{ Body: CreateProductListBody[] }>,
+  reply: FastifyReply
+) => {
+  try {
+    const products = req.body;
+
+    const createdProducts = await Product.insertMany(
+      products.map((product) => ({
+        name: product.TenHang,
+        description: product.TenHang,
+        price: product.GiaBan,
+        cost: product.GiaVon,
+        stock: product.TonKho,
+        ordered: product.KhachDat,
+        code: product.MaHang,
+        category: "General",
+      }))
+    );
+    if (createdProducts.length === 0) {
+      return reply
+        .status(HttpStatusCode.BAD_REQUEST)
+        .send({ error: "No products were created" });
+    }
+
+    return reply.status(HttpStatusCode.INSERT_OK).send(createdProducts);
+  } catch (error: any) {
+    return reply
+      .status(HttpStatusCode.BAD_REQUEST)
+      .send({ error: "Error creating product list", details: error.message });
+  }
+};
 
 // Get the list of products
 export const getProducts = async (req: FastifyRequest, reply: FastifyReply) => {
   try {
     const products = await Product.find();
     return reply.status(HttpStatusCode.OK).send(products);
+  } catch (error: any) {
+    return reply
+      .status(HttpStatusCode.BAD_REQUEST)
+      .send({ error: "Error fetching products", details: error.message });
+  }
+};
+export const getProducts_Small = async (
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
+  try {
+    const products = await Product.find();
+    return reply.status(HttpStatusCode.OK).send(
+      products.map((product) => ({
+        id: product._id,
+        name: product.name,
+        cost: product.cost,
+        stock: product.stock,
+        price: product.price,
+      }))
+    );
   } catch (error: any) {
     return reply
       .status(HttpStatusCode.BAD_REQUEST)

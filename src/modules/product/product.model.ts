@@ -10,6 +10,10 @@ const transactionSchema = new Schema(
       enum: ["IN", "OUT"], // 'IN' là nhập kho, 'OUT' là xuất kho
       required: true,
     },
+    cusName: {
+      type: String,
+      required: false,
+    },
     quantity: {
       type: Number,
       required: true,
@@ -37,6 +41,12 @@ const transactionSchema = new Schema(
 
 const productSchema = new Schema(
   {
+    code: {
+      type: String,
+      required: true,
+      unique: true, // Mã hàng phải là duy nhất
+      trim: true,
+    },
     name: {
       type: String,
       required: true,
@@ -48,6 +58,16 @@ const productSchema = new Schema(
       trim: true,
     },
     price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    cost: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    ordered: {
       type: Number,
       required: true,
       min: 0,
