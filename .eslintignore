@@ -1,0 +1,44 @@
+# Build outputs
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Configuration files
+.eslintrc.js
+jest.*.config.js
+
+# Coverage reports
+coverage/
+
+# Environment files
+.env*
+
+# Log files
+*.log
+logs/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Git files
+.git/
+
+# Generated files
+*.generated.ts
+*.d.ts
+
+# Migration specific
+# Allow linting of migration files but exclude auto-generated ones
+src/migrations/scripts/_*.ts
