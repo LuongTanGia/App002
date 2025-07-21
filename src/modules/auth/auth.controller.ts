@@ -1,69 +1,167 @@
-// src/modules/auth/auth.controller.ts
 import { FastifyReply, FastifyRequest } from "fastify";
 import jwt from "jsonwebtoken";
 import User from "./user.model";
-import dotenv from "dotenv";
+import HttpStatusCode from "../../errors/HttpStatusCode";
+import { ErrorResponse } from "../../types/common.types";
+import {
+  RegisterUserBody,
+  LoginUserBody,
+  AuthResponse,
+  UserPayload,
+} from "./auth.types";
+import { SecurityUtils } from "../../utils/security.utils";
+import {
+  ValidationError,
+  ConflictError,
+  UnauthorizedError,
+} from "../../errors/AppError";
 
-dotenv.config();
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret"; // Thêm secret key trong .env
-
-// Đăng ký người dùng mới
+/**
+ * Register a new user with enhanced security
+ */
 export const registerUser = async (
-  req: FastifyRequest,
+  req: FastifyRequest<{ Body: RegisterUserBody }>,
   reply: FastifyReply
-) => {
-  const { username, email, password } = req.body as {
-    username: string;
-    email: string;
-    password: string;
-  };
-
+): Promise<void> => {
   try {
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return reply.status(400).send({ error: "Email is already in use" });
+    const { username, email, password } = req.body;
+
+    // Sanitize inputs
+    const sanitizedUsername = SecurityUtils.sanitizeInput(
+      username?.trim() || ""
+    );
+    const sanitizedEmail = SecurityUtils.sanitizeInput(email?.trim() || "");
+
+    // Input validation
+    if (!sanitizedUsername) {
+      throw new ValidationError("Username is required");
     }
 
-    const user = new User({ username, email, password });
+    if (!sanitizedEmail) {
+      throw new ValidationError("Email is required");
+    }
+
+    if (!password?.trim()) {
+      throw new ValidationError("Password is required");
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitizedEmail)) {
+      throw new ValidationError("Invalid email format");
+    }
+
+    // Enhanced password validation using SecurityUtils
+    try {
+      SecurityUtils.validatePassword(password);
+    } catch (error) {
+      throw new ValidationError(
+        error instanceof Error ? error.message : "Password validation failed"
+      );
+    }
+
+    // Check if user already exists
+    const userExists = await User.findOne({
+      $or: [
+        { email: sanitizedEmail.toLowerCase() },
+        { username: sanitizedUsername },
+      ],
+    });
+
+    if (userExists) {
+      const field =
+        userExists.email === sanitizedEmail.toLowerCase()
+          ? "email"
+          : "username";
+      throw new ConflictError(`User with this ${field} already exists`);
+    }
+
+    // Hash password using SecurityUtils
+    const hashedPassword = await SecurityUtils.hashPassword(password);
+
+    const user = new User({
+      username: sanitizedUsername,
+      email: sanitizedEmail.toLowerCase(),
+      password: hashedPassword,
+    });
+
     await user.save();
 
-    return reply.status(201).send({ message: "User registered successfully" });
+    reply
+      .status(HttpStatusCode.INSERT_OK)
+      .send({ message: "User registered successfully" } as AuthResponse);
   } catch (error) {
-    return reply.status(500).send({
-      error: "Error registering user",
-      details: (error as Error).message,
-    });
+    reply.status(HttpStatusCode.INTERNAL_SERVER_ERROR).send({
+      error: "Failed to register user",
+      details:
+        error instanceof Error ? error.message : "Unknown error occurred",
+    } as ErrorResponse);
   }
 };
 
-// Đăng nhập và tạo JWT token
-export const loginUser = async (req: FastifyRequest, reply: FastifyReply) => {
-  const { email, password } = req.body as { email: string; password: string };
-
+/**
+ * User login with enhanced security
+ */
+export const loginUser = async (
+  req: FastifyRequest<{ Body: LoginUserBody }>,
+  reply: FastifyReply
+): Promise<void> => {
   try {
+    const { email, password } = req.body;
+
+    // Sanitize inputs
+    const sanitizedEmail = SecurityUtils.sanitizeInput(email?.trim() || "");
+
+    // Input validation
+    if (!sanitizedEmail) {
+      throw new ValidationError("Email is required");
+    }
+
+    if (!password?.trim()) {
+      throw new ValidationError("Password is required");
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitizedEmail)) {
+      throw new ValidationError("Invalid email format");
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
-      return reply.status(400).send({ error: "Invalid credentials" });
+      throw new UnauthorizedError("Invalid credentials");
     }
 
     const isMatch = await (user as any).comparePassword(password);
     if (!isMatch) {
-      return reply.status(400).send({ error: "Invalid credentials" });
+      throw new UnauthorizedError("Invalid credentials");
     }
 
-    const token = jwt.sign(
-      { userId: user._id, userName: user.username },
-      JWT_SECRET,
-      {
-        expiresIn: "1d",
-      }
-    );
+    const tokenPayload: UserPayload = {
+      userId: user._id.toString(),
+      userName: user.username,
+    };
 
-    return reply.status(200).send({ message: "Login successful", token });
+    // Use SecurityUtils for token generation
+    const token = SecurityUtils.generateToken(tokenPayload);
+
+    reply.status(HttpStatusCode.OK).send({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        role: (user as any).role || "user",
+      },
+    } as AuthResponse);
   } catch (error) {
-    return reply
-      .status(500)
-      .send({ error: "Error logging in", details: (error as Error).message });
+    reply.status(HttpStatusCode.INTERNAL_SERVER_ERROR).send({
+      error: "Failed to login",
+      details:
+        error instanceof Error ? error.message : "Unknown error occurred",
+    } as ErrorResponse);
   }
 };

@@ -1,13 +1,10 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import Invoice from "./invoice.model";
 import Product from "../product/product.model";
-import HttpStatusCode from "../../errors/HttpStatusCode";
 import Customer from "../customer/customer.model";
-
-interface CreateInvoiceBody {
-  customerId: string;
-  items: { productId: string; quantity: number }[];
-}
+import HttpStatusCode from "../../errors/HttpStatusCode";
+import { ErrorResponse } from "../../types/common.types";
+import { CreateInvoiceBody } from "./invoice.types";
 
 export const createInvoice = async (
   req: FastifyRequest<{ Body: CreateInvoiceBody }>,

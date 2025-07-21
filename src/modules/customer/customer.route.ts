@@ -1,19 +1,43 @@
 import { FastifyInstance } from "fastify";
 import {
-  getCustomers,
+  getAllCustomers,
   getCustomerById,
   createCustomer,
   updateCustomerDebt,
-  getCustomers_Small,
+  getCustomersSummary,
 } from "./customer.controller";
+import {
+  validateCreateCustomer,
+  validateUpdateCustomerDebt,
+  validateCustomerParams,
+} from "../../middlewares/validation.middleware";
 
 const customerRoutes = async (app: FastifyInstance) => {
-  app.get("/", getCustomers);
-  app.get("/:id", getCustomerById);
-  app.post("/", createCustomer);
-  app.get("/list", getCustomers_Small);
+  // Get routes
+  app.get("/", getAllCustomers);
+  app.get("/summary", getCustomersSummary);
 
-  app.post("/update-debt", updateCustomerDebt);
+  // Routes with validation
+  app.route({
+    method: "GET",
+    url: "/:id",
+    preHandler: validateCustomerParams,
+    handler: getCustomerById as any,
+  });
+
+  app.route({
+    method: "POST",
+    url: "/",
+    preHandler: validateCreateCustomer,
+    handler: createCustomer as any,
+  });
+
+  app.route({
+    method: "POST",
+    url: "/update-debt",
+    preHandler: validateUpdateCustomerDebt,
+    handler: updateCustomerDebt as any,
+  });
 };
 
 export default customerRoutes;

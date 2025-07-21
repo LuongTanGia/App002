@@ -1,26 +1,29 @@
-// src/modules/inventory/product.route.ts
 import { FastifyInstance } from "fastify";
 import {
   createProduct,
   deleteProduct,
   getProductById,
-  getProducts,
+  getAllProducts,
   stockIn,
   stockOut,
   createProductList,
-  getProducts_Small,
+  getProductsSummary,
 } from "./product.controller";
 
 const productRoutes = async (app: FastifyInstance) => {
-  // Route để tạo sản phẩm
-  app.get("/", getProducts);
-  app.get("/list", getProducts_Small);
+  // Get routes
+  app.get("/", getAllProducts);
+  app.get("/summary", getProductsSummary);
   app.get("/:id", getProductById);
+
+  // Post routes
   app.post("/", createProduct);
+  app.post("/batch", createProductList);
   app.post("/stock-in", stockIn);
   app.post("/stock-out", stockOut);
+
+  // Delete route (should be DELETE method but keeping POST for compatibility)
   app.post("/delete", deleteProduct);
-  app.post("/list", createProductList);
 };
 
 export default productRoutes;

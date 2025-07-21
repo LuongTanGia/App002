@@ -1,112 +1,165 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import Customer from "./customer.model";
 import HttpStatusCode from "../../errors/HttpStatusCode";
+import { ErrorResponse } from "../../types/common.types";
+import {
+  NotFoundError,
+  ConflictError,
+  ValidationError,
+  DatabaseError,
+} from "../../errors/AppError";
+import { validateAsync } from "../../validators/validator";
+import {
+  createCustomerSchema,
+  updateCustomerDebtSchema,
+  customerParamsSchema,
+} from "../../validators/schemas";
+import {
+  CreateCustomerBody,
+  UpdateCustomerDebtBody,
+  CustomerParams,
+  CustomerSummary,
+} from "./customer.types";
 
-export const getCustomers = async (
+/**
+ * Get all customers with complete information
+ */
+export const getAllCustomers = async (
   req: FastifyRequest,
   reply: FastifyReply
-) => {
+): Promise<void> => {
   try {
-    const customers = await Customer.find();
-    return reply.status(HttpStatusCode.OK).send(customers);
-  } catch (error: any) {
-    return reply
-      .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-      .send({ error: "Error fetching customers", details: error.message });
+    const customers = await Customer.find().select("-__v").lean();
+    reply.status(HttpStatusCode.OK).send(customers);
+  } catch (error) {
+    throw new DatabaseError("Failed to fetch customers");
   }
 };
-export const getCustomers_Small = async (
+/**
+ * Get customers summary (id and name only) for dropdowns/selection
+ */
+export const getCustomersSummary = async (
   req: FastifyRequest,
   reply: FastifyReply
-) => {
+): Promise<void> => {
   try {
-    const customers = await Customer.find();
-    return reply.status(HttpStatusCode.OK).send(
-      customers.map((customer) => ({
-        id: customer._id,
-        name: customer.name,
-      }))
-    );
-  } catch (error: any) {
-    return reply
-      .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-      .send({ error: "Error fetching customers", details: error.message });
+    const customers = await Customer.find().select("name").lean();
+    const customersSummary: CustomerSummary[] = customers.map((customer) => ({
+      id: customer._id.toString(),
+      name: customer.name,
+    }));
+
+    reply.status(HttpStatusCode.OK).send(customersSummary);
+  } catch (error) {
+    throw new DatabaseError("Failed to fetch customers summary");
   }
 };
+/**
+ * Get customer by ID
+ */
 export const getCustomerById = async (
-  req: FastifyRequest<{ Params: { id: string } }>,
+  req: FastifyRequest<{ Params: CustomerParams }>,
   reply: FastifyReply
-) => {
+): Promise<void> => {
+  // Validate params
+  const validatedParams = await validateAsync(customerParamsSchema, req.params);
+  const { id } = validatedParams;
+
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findById(id).select("-__v").lean();
+
     if (!customer) {
-      return reply
-        .status(HttpStatusCode.NOT_FOUND)
-        .send({ error: "Customer not found" });
+      throw new NotFoundError("Customer not found");
     }
-    return reply.status(HttpStatusCode.OK).send(customer);
-  } catch (error: any) {
-    return reply
-      .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-      .send({ error: "Error fetching customer", details: error.message });
+
+    reply.status(HttpStatusCode.OK).send(customer);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to fetch customer");
   }
 };
+/**
+ * Create a new customer
+ */
 export const createCustomer = async (
-  req: FastifyRequest<{
-    Body: { name: string; email: string; phone: string; address: string };
-  }>,
+  req: FastifyRequest<{ Body: CreateCustomerBody }>,
   reply: FastifyReply
-) => {
-  try {
-    const { name, email, phone, address } = req.body;
+): Promise<void> => {
+  // Validate request body
+  const validatedBody = await validateAsync(createCustomerSchema, req.body);
+  const { name, email, phone, address } = validatedBody;
 
-    const existingCustomer = await Customer.findOne({ email });
+  try {
+    // Check for existing customer with same email
+    const existingCustomer = await Customer.findOne({
+      email: email.toLowerCase(),
+    });
+
     if (existingCustomer) {
-      return reply
-        .status(HttpStatusCode.BAD_REQUEST)
-        .send({ error: "Customer with the same email already exists" });
+      throw new ConflictError("Customer with this email already exists");
     }
+
     const customer = new Customer({
       name,
-      email,
+      email: email.toLowerCase(),
       phone,
       address,
     });
+
     await customer.save();
-    return reply.status(HttpStatusCode.INSERT_OK).send(customer);
-  } catch (error: any) {
-    return reply
-      .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-      .send({ error: "Error creating customer", details: error.message });
+
+    // Return clean response
+    const customerResponse = customer.toObject();
+    const { __v, ...cleanCustomerResponse } = customerResponse;
+
+    reply.status(HttpStatusCode.CREATED).send(cleanCustomerResponse);
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to create customer");
   }
 };
+/**
+ * Update customer debt and add transaction record
+ */
 export const updateCustomerDebt = async (
-  req: FastifyRequest<{
-    Body: { total: number; customerId: string; note: string };
-  }>,
+  req: FastifyRequest<{ Body: UpdateCustomerDebtBody }>,
   reply: FastifyReply
-) => {
-  try {
-    const { total, customerId, note } = req.body;
+): Promise<void> => {
+  // Validate request body
+  const validatedBody = await validateAsync(updateCustomerDebtSchema, req.body);
+  const { total, customerId, note } = validatedBody;
 
+  try {
     const customer = await Customer.findById(customerId);
+
     if (!customer) {
-      return reply
-        .status(HttpStatusCode.NOT_FOUND)
-        .send({ error: "Customer not found" });
+      throw new NotFoundError("Customer not found");
     }
+
+    // Update debt and add transaction
     customer.debt = (customer.debt || 0) + total;
     customer.transactions.push({
       amount: total,
       date: new Date(),
-      note: note || "",
-      performedBy: req.user?.name || "System",
+      note: note?.trim() || "",
+      performedBy: req.user?.userName || "System",
     });
+
     await customer.save();
-    return reply.status(HttpStatusCode.OK).send(customer);
-  } catch (error: any) {
-    return reply
-      .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-      .send({ error: "Error updating customer debt", details: error.message });
+
+    // Return clean response
+    const customerResponse = customer.toObject();
+    const { __v, ...cleanCustomerResponse } = customerResponse;
+
+    reply.status(HttpStatusCode.OK).send(cleanCustomerResponse);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    throw new DatabaseError("Failed to update customer debt");
   }
 };

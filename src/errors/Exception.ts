@@ -1,19 +1,31 @@
 import { OutputType, print } from "../helpers/print";
+import { AppError } from "./AppError";
+import HttpStatusCode from "./HttpStatusCode";
 
-export default class Exception extends Error {
+/**
+ * @deprecated Use AppError and its subclasses instead
+ * Legacy Exception class for backward compatibility
+ */
+export default class Exception extends AppError {
   static WRONG_DB_USERNAME_PASSWORD = "Wrong database's username and password";
   static WRONG_DB_SERVERNAME = "Wrong server name/connection string";
   static WRONG_DB_CANNOT_CONNECT = "Cannot connect to Mongoose";
   static USER_EXIST = "User already exists";
   static USER_NOT_EXIST = "User not exists";
-
   static CANNOT_REGISTER_USER = "Cannot register user";
   static WRONG_EMAIL_PASSWORD = "Wrong email or password";
 
   validationErrors: Record<string, any>;
 
   constructor(message: string, validationErrors: Record<string, any> = {}) {
-    super(message);
+    super(
+      message,
+      HttpStatusCode.INTERNAL_SERVER_ERROR,
+      true,
+      validationErrors
+    );
+
+    // Legacy behavior - print error
     print(message, OutputType.ERROR);
     this.validationErrors = validationErrors;
   }

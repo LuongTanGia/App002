@@ -6,8 +6,6 @@ import { UserPayload } from "./auth.types";
 import { SecurityUtils } from "../../utils/security.utils";
 import { AppError, UnauthorizedError } from "../../errors/AppError";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
-
 /**
  * Verify JWT token middleware with enhanced security
  */
@@ -111,6 +109,30 @@ export const sanitizeInput = async (
   req: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> => {
+  // Helper function to recursively sanitize object properties
+  const sanitizeObject = (obj: any): any => {
+    if (typeof obj === "string") {
+      return SecurityUtils.sanitizeInput(obj);
+    }
+
+    if (typeof obj === "object" && obj !== null && !Array.isArray(obj)) {
+      const sanitized: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        // Sanitize the key as well
+        const sanitizedKey = SecurityUtils.sanitizeInput(String(key));
+        sanitized[sanitizedKey] = sanitizeObject(value);
+      }
+      return sanitized;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map((item) => sanitizeObject(item));
+    }
+
+    // Return primitive values as-is (numbers, booleans, null, undefined)
+    return obj;
+  };
+
   if (req.body && typeof req.body === "object") {
     req.body = sanitizeObject(req.body);
   }
@@ -118,29 +140,4 @@ export const sanitizeInput = async (
   if (req.query && typeof req.query === "object") {
     req.query = sanitizeObject(req.query);
   }
-};
-
-/**
- * Helper function to sanitize object recursively
- */
-const sanitizeObject = (obj: any): any => {
-  if (typeof obj === "string") {
-    return SecurityUtils.sanitizeInput(obj);
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeObject);
-  }
-
-  if (obj && typeof obj === "object") {
-    const sanitized: any = {};
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        sanitized[key] = sanitizeObject(obj[key]);
-      }
-    }
-    return sanitized;
-  }
-
-  return obj;
 };
