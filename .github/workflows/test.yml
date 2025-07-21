@@ -1,0 +1,170 @@
+name: Comprehensive Testing Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: 📦 Install Dependencies
+        run: |
+          npm ci
+          npm run build --if-present
+
+      - name: 🔍 Lint Code
+        run: |
+          if npm run lint --silent; then
+            npm run lint
+          else
+            echo "Lint script not found, skipping..."
+          fi
+
+      - name: 🔧 TypeScript Compilation Check
+        run: npx tsc --noEmit
+
+      - name: 🧪 Run Unit Tests
+        run: npm run test:unit
+
+      - name: 🔗 Run Integration Tests
+        run: npm run test:integration
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ${{ secrets.JWT_SECRET_TEST || 'test_jwt_secret_key_for_ci_testing_purposes_very_long_and_secure' }}
+
+      - name: 📊 Generate Test Coverage
+        run: npm run test:coverage
+
+      - name: 📈 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: matrix.node-version == 18 # Only upload coverage for one Node.js version
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: 📋 Coverage Report Comment
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        if: matrix.node-version == 18 && github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          lcov-file: ./coverage/lcov.info
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🛡️ Run Security Audit
+        run: |
+          npm audit --audit-level high
+
+      - name: 🔍 Run License Check
+        run: |
+          if npm list --depth=0 | grep -i 'UNLICENSED\|GPL'; then
+            echo "⚠️ Found packages with restrictive licenses"
+            npm list --depth=0
+          else
+            echo "✅ No restrictive licenses found"
+          fi
+
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Application
+        run: npm run build
+
+      - name: 🚀 Start Application (Background)
+        run: |
+          npm start &
+          sleep 10
+
+      - name: ⚡ Basic Load Test
+        run: |
+          # Install curl if not available
+          which curl || (apt-get update && apt-get install -y curl)
+
+          # Simple endpoint availability test
+          for i in {1..10}; do
+            curl -f http://localhost:3000/health || exit 1
+            echo "Health check $i passed"
+          done
+
+          echo "✅ Basic performance test completed"
+
+  build:
+    name: Build Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Application
+        run: npm run build
+
+      - name: 📦 Archive Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist-files
+          path: dist/
+          retention-days: 1

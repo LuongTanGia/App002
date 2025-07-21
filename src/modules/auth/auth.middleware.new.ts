@@ -5,6 +5,7 @@ import { ErrorResponse } from "../../types/common.types";
 import { UserPayload } from "./auth.types";
 import { SecurityUtils } from "../../utils/security.utils";
 import { AppError, UnauthorizedError } from "../../errors/AppError";
+import { OutputType, print } from "../../helpers/print";
 
 /**
  * Verify JWT token middleware with enhanced security
@@ -50,8 +51,9 @@ export const verifyToken = async (
 
     // Optional: Log successful authentication in development
     if (process.env.NODE_ENV === "development") {
-      console.log(
-        `🔐 Authenticated user: ${req.user.userName} (${req.user.userId})`
+      print(
+        `🔐 Authenticated user: ${req.user.userName} (${req.user.userId})`,
+        OutputType.SUCCESS
       );
     }
   } catch (error) {

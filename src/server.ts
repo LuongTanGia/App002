@@ -3,15 +3,19 @@ dotenv.config();
 
 import app from "./app";
 import connect from "./database/db";
+import { print, OutputType } from "./helpers/print";
 
 const start = async () => {
   try {
     const PORT = process.env.PORT || 3000;
     await connect();
     await app.listen({ port: +PORT, host: "0.0.0.0" });
-    console.log(`🚀 Server is running at http://localhost:${PORT}`);
+    print(
+      `🚀 Server is running at http://localhost:${PORT}`,
+      OutputType.SUCCESS
+    );
   } catch (err) {
-    console.error("❌ Server startup error:", err);
+    print(`❌ Server startup error: ${err}`, OutputType.ERROR);
     process.exit(1);
   }
 };

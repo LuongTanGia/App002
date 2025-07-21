@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { OutputType, print } from "../helpers/print";
 import { DatabaseError } from "../errors/AppError";
+import { getMigrationService } from "../migrations";
 
 mongoose.set("strictQuery", true);
 
@@ -49,6 +50,18 @@ const connect = async () => {
     mongoose.connection.on("reconnected", () => {
       print("MongoDB reconnected", OutputType.SUCCESS);
     });
+
+    // Run migration service on successful connection
+    try {
+      const migrationService = getMigrationService();
+      await migrationService.runOnStartup();
+    } catch (migrationError: any) {
+      print(
+        `⚠️ Migration service warning: ${migrationError.message}`,
+        OutputType.WARNING
+      );
+      // Don't throw here - let the app continue even if migrations have issues
+    }
 
     return connection;
   } catch (error: any) {

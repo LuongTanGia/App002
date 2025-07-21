@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { SecurityConfig } from "../config/security.config";
 import { UnauthorizedError } from "../errors/AppError";
+import { OutputType, print } from "../helpers/print";
 
 export class SecurityUtils {
   /**
@@ -24,7 +25,10 @@ export class SecurityUtils {
    */
   static getJWTSecret(): string {
     const secret = process.env.JWT_SECRET;
-    console.log("🚀 ~ SecurityUtils ~ getJWTSecret ~ secret:", secret);
+    print(
+      "🚀 ~ SecurityUtils ~ getJWTSecret ~ secret:" + " " + secret,
+      OutputType.SUCCESS
+    );
 
     if (!secret || !this.validateJWTSecret(secret)) {
       if (process.env.NODE_ENV === "production") {
@@ -34,8 +38,9 @@ export class SecurityUtils {
       }
 
       // Generate a warning for development
-      console.warn(
-        "⚠️  WARNING: Using weak or missing JWT_SECRET. Generate a strong secret for production!"
+      print(
+        "⚠️  WARNING: Using weak or missing JWT_SECRET. Generate a strong secret for production!",
+        OutputType.WARNING
       );
       return this.generateJWTSecret();
     }
